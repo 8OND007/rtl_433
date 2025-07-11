@@ -1,4 +1,4 @@
-name: Build rtl_433 for Windows and Alpine Linux
+name: Build rtl_433 Fully Static Alpine Linux Binary
 
 on:
   push:
@@ -6,41 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows:
-    name: Build Windows EXE
-    runs-on: windows-latest
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Install dependencies
-      run: |
-        choco install make -y
-        choco install mingw -y
-
-    - name: Install latest CMake
-      uses: jwlawson/actions-setup-cmake@v1
-      with:
-        version: '3.27.5'  # latest stable CMake
-
-    - name: Add MinGW to PATH
-      run: echo "C:\\ProgramData\\chocolatey\\lib\\mingw\\tools\\install\\mingw64\\bin" >> $env:GITHUB_PATH
-
-    - name: Build
-      run: |
-        mkdir build
-        cd build
-        cmake -G "MinGW Makefiles" ..
-        mingw32-make
-
-    - name: Upload Windows binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: rtl_433_windows
-        path: build/rtl_433.exe
-
-  alpine:
-    name: Build Alpine Linux Binary
+  alpine_static:
+    name: Build Fully Static Alpine Linux Binary
     runs-on: ubuntu-latest
 
     container:
@@ -48,24 +15,53 @@ jobs:
 
     steps:
     - name: Install build dependencies
-      run: apk add --no-cache build-base cmake git libusb-dev linux-headers librtlsdr-dev
+      run: |
+        apk add --no-cache \
+          build-base cmake git autoconf automake libtool pkgconf linux-headers
 
-    - name: Clone repo and init submodules
+    - name: Build libusb (static)
+      run: |
+        git clone https://github.com/libusb/libusb.git
+        cd libusb
+        ./autogen.sh
+        ./configure --enable-static --disable-shared
+        make
+        make install
+        cd ..
+
+    - name: Build librtlsdr (static)
+      run: |
+        git clone https://github.com/steve-m/librtlsdr.git
+        cd librtlsdr
+        mkdir build
+        cd build
+        cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=/usr ..
+        make
+        make install
+        cd ../..
+
+    - name: Clone rtl_433 repo and init submodules
       run: |
         git clone https://github.com/8OND007/rtl_433.git
         cd rtl_433
         git submodule update --init --recursive
 
-    - name: Build rtl_433
+    - name: Build rtl_433 static binary
       run: |
         cd rtl_433
         mkdir build
         cd build
-        cmake -DBUILD_STATIC=ON ..
+        export PKG_CONFIG_PATH=/usr/lib/pkgconfig
+        cmake -DBUILD_STATIC=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_EXE_LINKER_FLAGS="-static" ..
         make VERBOSE=1
 
-    - name: Upload Alpine binary
+    - name: Verify binary is static
+      run: |
+        file rtl_433/build/src/rtl_433
+        ldd rtl_433/build/src/rtl_433 || echo "Not dynamically linked"
+
+    - name: Upload static Alpine binary
       uses: actions/upload-artifact@v4
       with:
-        name: rtl_433_alpine
+        name: rtl_433_alpine_static
         path: rtl_433/build/src/rtl_433
