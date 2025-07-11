@@ -51,7 +51,8 @@ jobs:
           cmake \
           git \
           libusb-dev \
-          linux-headers
+          linux-headers \
+          librtlsdr-dev
 
     - name: Clone repo and init submodules
       run: |
