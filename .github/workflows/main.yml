@@ -46,16 +46,26 @@ jobs:
     steps:
     - name: Install build dependencies
       run: |
-        apk add --no-cache build-base cmake git libusb-dev
+        apk add --no-cache \
+          build-base \
+          cmake \
+          git \
+          libusb-dev \
+          linux-headers
 
-    - name: Clone rtl_433 repo and build
+    - name: Clone repo and init submodules
       run: |
         git clone https://github.com/8OND007/rtl_433.git
+        cd rtl_433
+        git submodule update --init --recursive
+
+    - name: Build rtl_433
+      run: |
         cd rtl_433
         mkdir build
         cd build
         cmake -DBUILD_STATIC=ON ..
-        make
+        make VERBOSE=1
 
     - name: Upload Alpine binary
       uses: actions/upload-artifact@v4
