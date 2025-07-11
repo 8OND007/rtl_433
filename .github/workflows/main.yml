@@ -1,12 +1,13 @@
-name: Build rtl_433 Windows EXE
+name: Build rtl_433 for Windows and Alpine Linux
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  windows:
+    name: Build Windows EXE
     runs-on: windows-latest
 
     steps:
@@ -29,8 +30,35 @@ jobs:
         cmake -G "MinGW Makefiles" ..
         mingw32-make
 
-    - name: Upload executable
+    - name: Upload Windows binary
       uses: actions/upload-artifact@v4
       with:
-        name: rtl_433_exe
+        name: rtl_433_windows
         path: build/rtl_433.exe
+
+  alpine:
+    name: Build Alpine Linux Binary
+    runs-on: ubuntu-latest
+
+    container:
+      image: alpine:latest
+
+    steps:
+    - name: Install build dependencies
+      run: |
+        apk add --no-cache build-base cmake git libusb-dev
+
+    - name: Clone rtl_433 repo and build
+      run: |
+        git clone https://github.com/8OND007/rtl_433.git
+        cd rtl_433
+        mkdir build
+        cd build
+        cmake -DBUILD_STATIC=ON ..
+        make
+
+    - name: Upload Alpine binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: rtl_433_alpine
+        path: rtl_433/build/rtl_433
