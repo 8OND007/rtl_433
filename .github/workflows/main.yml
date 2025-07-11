@@ -1,0 +1,36 @@
+name: Build rtl_433 Windows EXE
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+        choco install make -y
+        choco install mingw -y
+
+    - name: Add MinGW to PATH
+      run: |
+        echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $env:GITHUB_PATH
+
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake -G "MinGW Makefiles" ..
+        mingw32-make
+
+    - name: Upload executable
+      uses: actions/upload-artifact@v3
+      with:
+        name: rtl_433_exe
+        path: build/rtl_433.exe
