@@ -21,7 +21,7 @@ jobs:
     - name: Install latest CMake
       uses: jwlawson/actions-setup-cmake@v1
       with:
-        version: '3.27.5'  # Latest stable version
+        version: '3.27.5'  # latest stable CMake
 
     - name: Add MinGW to PATH
       run: echo "C:\\ProgramData\\chocolatey\\lib\\mingw\\tools\\install\\mingw64\\bin" >> $env:GITHUB_PATH
@@ -48,14 +48,7 @@ jobs:
 
     steps:
     - name: Install build dependencies
-      run: |
-        apk add --no-cache \
-          build-base \
-          cmake \
-          git \
-          libusb-dev \
-          linux-headers \
-          librtlsdr-dev
+      run: apk add --no-cache build-base cmake git libusb-dev linux-headers librtlsdr-dev
 
     - name: Clone repo and init submodules
       run: |
@@ -71,14 +64,8 @@ jobs:
         cmake -DBUILD_STATIC=ON ..
         make VERBOSE=1
 
-    - name: List build directory contents
-      run: ls -l rtl_433/build
-
-    - name: Find rtl_433 binary file(s)
-      run: find rtl_433/build -type f -executable -exec ls -l {} +
-
     - name: Upload Alpine binary
       uses: actions/upload-artifact@v4
       with:
         name: rtl_433_alpine
-        path: rtl_433/build/rtl_433
+        path: rtl_433/build/src/rtl_433
