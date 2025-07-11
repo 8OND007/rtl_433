@@ -30,7 +30,7 @@ jobs:
         mingw32-make
 
     - name: Upload executable
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: rtl_433_exe
         path: build/rtl_433.exe
