@@ -1,13 +1,22 @@
+name: Build rtl_433 static Alpine Linux binary
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install dependencies (build tools)
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
         run: |
-          apk update
-          apk add build-base cmake autoconf automake libtool pkgconfig
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf automake libtool pkg-config cmake git
 
       - name: Build static libusb without udev
         run: |
@@ -16,20 +25,20 @@ jobs:
           ./autogen.sh
           ./configure --disable-udev --enable-static --disable-shared
           make -j$(nproc)
-          make install
+          sudo make install
           cd ..
 
       - name: Build static librtlsdr without udev
         run: |
           git clone https://github.com/steve-m/librtlsdr.git
-          mkdir librtlsdr/build
+          mkdir -p librtlsdr/build
           cd librtlsdr/build
           cmake .. -DENABLE_UDEV=OFF -DENABLE_SHARED=OFF -DENABLE_STATIC=ON
           make -j$(nproc)
-          make install
+          sudo make install
           cd ../..
 
-      - name: Build static rtl_433
+      - name: Build static rtl_433 binary
         run: |
           mkdir -p rtl_433/build
           cd rtl_433/build
@@ -37,8 +46,8 @@ jobs:
           make -j$(nproc)
           cd ../..
 
-      - name: Upload binary
+      - name: Upload built binary
         uses: actions/upload-artifact@v4
         with:
-          name: rtl_433_static
+          name: rtl_433-static-binary
           path: rtl_433/build/src/rtl_433
