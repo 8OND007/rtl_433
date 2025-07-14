@@ -1,4 +1,4 @@
-name: Build Static Linux Binary (Alpine Compatible)
+name: Build Static Linux Binary (Alpine Compatible, no udev)
 
 on:
   push:
@@ -7,12 +7,11 @@ on:
 jobs:
   build-linux-static:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout this repository
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Alpine container and build
+    - name: Setup Alpine container and build static libs & binary
       uses: addnab/docker-run-action@v3
       with:
         image: alpine:3.22
@@ -20,6 +19,7 @@ jobs:
         run: |
           set -e
 
+          # Install build dependencies
           apk add --no-cache \
             build-base \
             cmake \
@@ -29,11 +29,12 @@ jobs:
             libtool \
             autoconf \
             automake \
-            pkgconf
+            pkgconf \
+            linux-headers \
+            musl-dev \
+            usbutils
 
-          #########################
-          # Build libusb (static)
-          #########################
+          # Build libusb static
           wget https://github.com/libusb/libusb/releases/download/v1.0.26/libusb-1.0.26.tar.bz2
           tar xf libusb-1.0.26.tar.bz2
           cd libusb-1.0.26
@@ -42,24 +43,31 @@ jobs:
           make install
           cd ..
 
-          #########################
-          # Build librtlsdr (static, no udev)
-          #########################
+          # Build librtlsdr static, explicitly disable udev
           git clone https://github.com/steve-m/librtlsdr.git
           cd librtlsdr
           mkdir build && cd build
-          cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DINSTALL_UDEV_RULES=OFF -DDETACH_KERNEL_DRIVER=ON -DENABLE_STATIC=ON -DENABLE_SHARED=OFF
+          cmake .. \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DINSTALL_UDEV_RULES=OFF \
+            -DDETACH_KERNEL_DRIVER=ON \
+            -DENABLE_STATIC=ON \
+            -DENABLE_SHARED=OFF \
+            -DENABLE_UDEV=OFF
           make -j$(nproc)
           make install
           cd ../..
 
-          #########################
-          # Clone rtl_433 and build static binary
-          #########################
+          # Clone rtl_433 and build fully static binary
           git clone https://github.com/merbanan/rtl_433.git
           cd rtl_433
           mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-static"
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXE_LINKER_FLAGS="-static" \
+            -DSTATIC=ON \
+            -DRTLSDR_STATIC=ON \
+            -DLIBUSB_STATIC=ON
           make -j$(nproc)
           cd ../..
 
