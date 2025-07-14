@@ -38,7 +38,7 @@ jobs:
           make install
           cd ..
 
-      - name: Build librtlsdr (static only, no shared object)
+      - name: Build librtlsdr (disable udev, build static)
         run: |
           git clone https://github.com/steve-m/librtlsdr.git
           cd librtlsdr
@@ -47,7 +47,7 @@ jobs:
           cmake \
             -DBUILD_STATIC=ON \
             -DBUILD_SHARED_LIBS=OFF \
-            -DDETACH_KERNEL_DRIVER=ON \
+            -DDETACH_KERNEL_DRIVER=OFF \  # disables libudev dependency
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
             -DCMAKE_INSTALL_PREFIX=/usr \
             ..
@@ -65,13 +65,7 @@ jobs:
             -DENABLE_DEMOD_FSK=ON \
             -DENABLE_ANALYZER=ON \
             -DENABLE_RTLSDR=ON \
-            -DENABLE_SOAPYSDR=OFF \
-            -DENABLE_AIRSPY=OFF \
-            -DENABLE_HACKRF=OFF \
             -DENABLE_USB=ON \
-            -DENABLE_PULSEAUDIO=OFF \
-            -DENABLE_MQTT=OFF \
-            -DENABLE_ZMQ=OFF \
             -DBUILD_TESTING=OFF \
             ..
           make -j$(nproc)
