@@ -1,68 +1,83 @@
-name: Build rtl_433 Fully Static Alpine Linux Binary
+name: Build static rtl_433 for Alpine Linux
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
-  alpine_static:
-    name: Build Fully Static Alpine Linux Binary
+  build-linux-static:
     runs-on: ubuntu-latest
-
     container:
       image: alpine:latest
 
     steps:
-    - name: Install build dependencies
-      run: |
-        apk add --no-cache \
-          build-base cmake git autoconf automake libtool pkgconf linux-headers \
-          libusb-dev eudev-dev
+      - name: Install dependencies
+        run: |
+          apk add --no-cache \
+            git \
+            build-base \
+            cmake \
+            libtool \
+            autoconf \
+            automake \
+            pkgconfig
 
-    - name: Build libusb (static)
-      run: |
-        git clone https://github.com/libusb/libusb.git
-        cd libusb
-        ./autogen.sh
-        ./configure --enable-static --disable-shared
-        make
-        make install
-        cd ..
+      - name: Checkout rtl_433
+        uses: actions/checkout@v4
 
-    - name: Build librtlsdr (static)
-      run: |
-        git clone https://github.com/steve-m/librtlsdr.git
-        cd librtlsdr
-        mkdir build
-        cd build
-        cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=/usr ..
-        make
-        make install
-        cd ../..
+      - name: Build libusb (static with -fPIC)
+        run: |
+          git clone https://github.com/libusb/libusb.git
+          cd libusb
+          ./bootstrap.sh
+          CFLAGS="-fPIC" ./configure --enable-static --disable-shared --prefix=/usr
+          make
+          make install
+          cd ..
 
-    - name: Clone rtl_433 repo and init submodules
-      run: |
-        git clone https://github.com/8OND007/rtl_433.git
-        cd rtl_433
-        git submodule update --init --recursive
+      - name: Build librtlsdr (static only, no shared object)
+        run: |
+          git clone https://github.com/steve-m/librtlsdr.git
+          cd librtlsdr
+          mkdir build
+          cd build
+          cmake \
+            -DBUILD_STATIC=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DDETACH_KERNEL_DRIVER=ON \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            ..
+          make
+          make install
+          cd ../..
 
-    - name: Build rtl_433 static binary
-      run: |
-        cd rtl_433
-        mkdir build
-        cd build
-        export PKG_CONFIG_PATH=/usr/lib/pkgconfig
-        cmake -DBUILD_STATIC=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_EXE_LINKER_FLAGS="-static" ..
-        make VERBOSE=1
+      - name: Build rtl_433 (statically linked)
+        run: |
+          mkdir build
+          cd build
+          cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_DEMOD_OOK=ON \
+            -DENABLE_DEMOD_FSK=ON \
+            -DENABLE_ANALYZER=ON \
+            -DENABLE_RTLSDR=ON \
+            -DENABLE_SOAPYSDR=OFF \
+            -DENABLE_AIRSPY=OFF \
+            -DENABLE_HACKRF=OFF \
+            -DENABLE_USB=ON \
+            -DENABLE_PULSEAUDIO=OFF \
+            -DENABLE_MQTT=OFF \
+            -DENABLE_ZMQ=OFF \
+            -DBUILD_TESTING=OFF \
+            ..
+          make -j$(nproc)
 
-    - name: Verify binary is static
-      run: |
-        file rtl_433/build/src/rtl_433
-        ldd rtl_433/build/src/rtl_433 || echo "Not dynamically linked"
-
-    - name: Upload static Alpine binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: rtl_433_alpine_static
-        path: rtl_433/build/src/rtl_433
+      - name: Upload rtl_433 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtl_433-static-linux
+          path: build/src/rtl_433
