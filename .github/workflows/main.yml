@@ -1,77 +1,60 @@
-name: Build static rtl_433 for Alpine Linux
+name: Build Static Linux Binary (Alpine Compatible)
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
   workflow_dispatch:
 
 jobs:
   build-linux-static:
     runs-on: ubuntu-latest
-    container:
-      image: alpine:latest
 
     steps:
-      - name: Install dependencies
+    - name: Checkout rtl_433 repository
+      uses: actions/checkout@v4
+
+    - name: Set up Alpine container
+      uses: addnab/docker-run-action@v3
+      with:
+        image: alpine:3.22
+        options: -v ${{ github.workspace }}:/work -w /work
         run: |
+          # Install build dependencies
           apk add --no-cache \
-            git \
             build-base \
             cmake \
+            git \
             libtool \
             autoconf \
             automake \
-            pkgconfig
+            pkgconf
 
-      - name: Checkout rtl_433
-        uses: actions/checkout@v4
-
-      - name: Build libusb (static with -fPIC)
-        run: |
+          # Build libusb (static)
           git clone https://github.com/libusb/libusb.git
           cd libusb
-          ./bootstrap.sh
+          ./autogen.sh
           CFLAGS="-fPIC" ./configure --enable-static --disable-shared --prefix=/usr
-          make
+          make -j$(nproc)
           make install
           cd ..
 
-      - name: Build librtlsdr (disable udev, build static)
-        run: |
+          # Build librtlsdr (static, no udev)
           git clone https://github.com/steve-m/librtlsdr.git
           cd librtlsdr
-          mkdir build
-          cd build
-          cmake \
-            -DBUILD_STATIC=ON \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DDETACH_KERNEL_DRIVER=OFF \  # disables libudev dependency
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-            -DCMAKE_INSTALL_PREFIX=/usr \
-            ..
-          make
+          ./autogen.sh
+          CFLAGS="-fPIC" ./configure --enable-static --disable-shared --disable-udev --prefix=/usr
+          make -j$(nproc)
           make install
+          cd ..
+
+          # Build rtl_433 statically
+          mkdir -p rtl_433/build
+          cd rtl_433/build
+          cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_SOAPYSDR=OFF -DENABLE_ADEUNIS=OFF -DENABLE_MQTT=OFF -DENABLE_HTTP=OFF -DENABLE_SYSLOG=OFF -DBUILD_TESTING=OFF -DENABLE_ANALYZER=OFF -DENABLE_INSTALL_UDEV_RULE=OFF -DENABLE_MANPAGES=OFF -DENABLE_SDL=OFF -DENABLE_HIDRAW=OFF -DCMAKE_EXE_LINKER_FLAGS="-static" ..
+          make -j$(nproc)
           cd ../..
 
-      - name: Build rtl_433 (statically linked)
-        run: |
-          mkdir build
-          cd build
-          cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DENABLE_DEMOD_OOK=ON \
-            -DENABLE_DEMOD_FSK=ON \
-            -DENABLE_ANALYZER=ON \
-            -DENABLE_RTLSDR=ON \
-            -DENABLE_USB=ON \
-            -DBUILD_TESTING=OFF \
-            ..
-          make -j$(nproc)
-
-      - name: Upload rtl_433 binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: rtl_433-static-linux
-          path: build/src/rtl_433
+    - name: Upload static rtl_433 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: rtl_433_linux_static
+        path: rtl_433/build/src/rtl_433
