@@ -9,47 +9,57 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout rtl_433 repository
+    - name: Checkout this repository
       uses: actions/checkout@v4
 
-    - name: Set up Alpine container
+    - name: Set up Alpine container and build
       uses: addnab/docker-run-action@v3
       with:
         image: alpine:3.22
         options: -v ${{ github.workspace }}:/work -w /work
         run: |
-          # Install build dependencies
+          set -e
+
           apk add --no-cache \
             build-base \
             cmake \
             git \
+            wget \
+            tar \
             libtool \
             autoconf \
             automake \
             pkgconf
 
+          #########################
           # Build libusb (static)
-          git clone https://github.com/libusb/libusb.git
-          cd libusb
-          ./autogen.sh
-          CFLAGS="-fPIC" ./configure --enable-static --disable-shared --prefix=/usr
+          #########################
+          wget https://github.com/libusb/libusb/releases/download/v1.0.26/libusb-1.0.26.tar.bz2
+          tar xf libusb-1.0.26.tar.bz2
+          cd libusb-1.0.26
+          ./configure --enable-static --disable-shared --prefix=/usr
           make -j$(nproc)
           make install
           cd ..
 
+          #########################
           # Build librtlsdr (static, no udev)
+          #########################
           git clone https://github.com/steve-m/librtlsdr.git
           cd librtlsdr
-          ./autogen.sh
-          CFLAGS="-fPIC" ./configure --enable-static --disable-shared --disable-udev --prefix=/usr
+          mkdir build && cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DINSTALL_UDEV_RULES=OFF -DDETACH_KERNEL_DRIVER=ON -DENABLE_STATIC=ON -DENABLE_SHARED=OFF
           make -j$(nproc)
           make install
-          cd ..
+          cd ../..
 
-          # Build rtl_433 statically
-          mkdir -p rtl_433/build
-          cd rtl_433/build
-          cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_SOAPYSDR=OFF -DENABLE_ADEUNIS=OFF -DENABLE_MQTT=OFF -DENABLE_HTTP=OFF -DENABLE_SYSLOG=OFF -DBUILD_TESTING=OFF -DENABLE_ANALYZER=OFF -DENABLE_INSTALL_UDEV_RULE=OFF -DENABLE_MANPAGES=OFF -DENABLE_SDL=OFF -DENABLE_HIDRAW=OFF -DCMAKE_EXE_LINKER_FLAGS="-static" ..
+          #########################
+          # Clone rtl_433 and build static binary
+          #########################
+          git clone https://github.com/merbanan/rtl_433.git
+          cd rtl_433
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-static"
           make -j$(nproc)
           cd ../..
 
