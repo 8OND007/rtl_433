@@ -18,7 +18,7 @@ jobs:
       run: |
         apk add --no-cache \
           build-base cmake git autoconf automake libtool pkgconf linux-headers \
-          libusb-dev libudev
+          libusb-dev eudev-dev
 
     - name: Build libusb (static)
       run: |
